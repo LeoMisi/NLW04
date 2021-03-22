@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { resolve } from "path";
 import { getCustomRepository } from "typeorm";
+import { AppError } from "../errors/AppError";
 import { SurveysRepository } from "../repositories/SurveysRepository";
 import { SurveysUsersRepository } from "../repositories/SurveysUsersRepository";
 import { UsersRepository } from "../repositories/UsersRepository";
@@ -16,33 +17,32 @@ class SendMailController {
 
     const user = await userRepository.findOne({ email });
     if (!user) {
-      return response.status(400).json({
-        error: "User do not exist!",
-      });
+      throw new AppError("Survey do not exist!");
     }
     const survey = await surveysRepository.findOne({
       id: survey_id,
     });
     if (!survey) {
-      return response.status(400).json({
-        error: "Survey do not exist!",
-      });
+      throw new AppError("Survey do not exist!");
     }
+
+    const npsPath = resolve(__dirname, "..", "views", "emails", "npsMail.hbs");
+
+    const surveyUserAlreadyExists = await surveysUsersRepository.findOne({
+      where: { user_id: user.id, value: null },
+      relations: ["user", "survey"],
+    });
 
     const variables = {
       name: user.name,
       title: survey.title,
       description: survey.description,
-      user_id: user.id,
+      id: "",
       link: process.env.URL_MAIL,
     };
-    const npsPath = resolve(__dirname, "..", "views", "emails", "npsMail.hbs");
 
-    const surveyUserAlreadyExists = await surveysUsersRepository.findOne({
-      where: [{ user_id: user.id }, { value: null }],
-      relations: ["user", "survey"],
-    });
     if (surveyUserAlreadyExists) {
+      variables.id = surveyUserAlreadyExists.id;
       await SendMailServices.execute(email, survey.title, variables, npsPath);
       return response.json(surveyUserAlreadyExists);
     }
@@ -54,6 +54,7 @@ class SendMailController {
     });
     await surveysUsersRepository.save(surveysUser);
 
+    variables.id = surveysUser.id;
     await SendMailServices.execute(email, survey.title, variables, npsPath);
 
     return response.json(surveysUser);

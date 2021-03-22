@@ -26,7 +26,7 @@ class SurveyUser {
   survey_id: string;
 
   @ManyToOne(() => Survey)
-  @JoinColumn({ name: "survey_id" })
+  @JoinColumn({ name: "surveys_id" })
   survey: Survey;
 
   @Column()
